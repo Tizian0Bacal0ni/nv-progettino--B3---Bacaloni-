@@ -5,6 +5,12 @@
 
 set -euo pipefail
 
+# Esco dalla directory del progetto
+cd ~
+
+# La cancello 
+rm -rf nv-progettino--B3---Bacaloni-
+
 echo "[1/8] Rimozione regola iptables MASQUERADE su POSTROUTING..."
 iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE \
   2>/dev/null && echo "  OK" || echo "  (non presente, skip)"
