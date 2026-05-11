@@ -53,13 +53,15 @@ Il pacchetto attraversa **due livelli di NAT** in sequenza:
 git clone https://github.com/Tizian0Bacal0ni/nv-progettino--B3---Bacaloni-
 
 # Per sicurezza entro nella repository
- cd nv-progettino-B3-bacaloni
+cd nv-progettino--B3---bacaloni-
 
-
+# Serve per usare i comandi rapidi su
+chmod +x Scripts/setup.sh
+chmod +x Scripts/teardown.sh
 
 
 # Lancia il setup
-sudo ./scripts/setup.sh
+sudo ./Scripts/setup.sh
 # Atteso: namespace ns2 creato, veth configurate, ip_forward=1,
 #         regola MASQUERADE aggiunta su POSTROUTING
 ```
@@ -83,22 +85,23 @@ sudo ip netns exec ns2 ping -c 3 www.google.com
 ### 4.3 Verifica NAT in azione — iptables (7A)
 
 ```bash
+# 
 sudo iptables -t nat -L POSTROUTING -n -v
-# Atteso: regola MASQUERADE con contatori pkts/bytes > 0 dopo i ping
+
 ```
+IP Masquerading ina zione : i pacchetti che arrivano dalla rete locale 10.0.0.0/24 e devono uscire su eth0 vengono MASQUERATI, per cui  il loro IP sorgente, privato, viene sostituito automaticamente con l'IP pubblico di eth0
 
 ### 4.4 Verifica NAT in azione — conntrack (7B)
 
 ```bash
 sudo conntrack -L | grep 8.8.8.8
-# Atteso: entry con src=10.0.0.101 (originale) e dst=172.20.130.x
-#         (IP tradotto) — prova dello SNAT effettivo
+
+#Serve per stamapre la tabella altrimenti non si vede nulla 
+sudo conntrack -L
+
 ```
-
-
-Il pacchetto attraversa **due livelli di NAT** in sequenza:
-1. iptables MASQUERADE: `10.0.0.101` → IP di `eth0` (main namespace WSL)
-2. NAT Hyper-V/Windows: IP di `eth0` → IP pubblico del router di casa
+Si interroga la tabella di connection tracking del kernel Linux (nf_conntrack) che elenca  tutti i flussi attualmente tracciati , e filtra  solo le entry che coinvolgono l'indirizzo IP 8.8.8.8 
+così da verificare  se esiste, o è esistita di recente, una connessione attiva tra un host della rete locale e il resolver DNS pubblico di Google, ispezionando lo stato del NAT/conntrack in tempo reale. Serve a confermare che  DNS/NTP esca correttamente attraverso il gateway e che il MASQUERADE su eth0 vada bene
 
 
 
@@ -151,10 +154,10 @@ Servono 3 terminali: quello di lavoro + altri 2
 # Disabilita ip_forward
 sudo sysctl -w net.ipv4.ip_forward=0
 
-# Attivazione sniffer lato veth0 (interno a ns2, quindi)
+# Attivazione sniffer lato veth0 (estremità del cavo interna a namespace)
  sudo tcpdump -n -i veth0 icmp
 
-#ATtivazione sniffer lato eth0 ( interno a mainspace, quindi non dovrebbe vedere)
+#ATtivazione sniffer lato eth0 ( interfaccia che punta verso internet)
  sudo tcpdump -n -i eth0 icmp
 
 # Ping a google sul Terminale C
@@ -163,31 +166,51 @@ sudo ip netns exec ns2 ping -c 3 8.8.8.8
 # Ripristina
 sudo sysctl -w net.ipv4.ip_forward=1
 ```
-Il test chiaramente fallisce, nel senso che lo sniffer interno a ns2 vede i pacchetti con IP di partenza privato
-mentre quello attivato nel mainspace non vede nulla e registra solo silenzion perché non gli vengono forwardati: nonostante
+Il test chiaramente fallisce, nel senso che lo sniffer interno a ns2 vede i pacchetti con IP di partenza privato perchè escono da ns2 verso 
+il mainspace passando da li. Al contrario eth0  non vede nulla e registra solo silenzion perché non gli vengono forwardati: nonostante
 il MASQUERADE sia attivo il kernel droppa i pacchetti prima che si attivi la carena POSTROUTING di iptables
 
 
 ### 4.8 Estensione A — DNAT per esporre un servizio in ns2
 
 ```bash
-# Avvia web server dentro ns2
-sudo ip netns exec ns2 python3 -m http.server 8000 &
-# Atteso: Serving HTTP on 0.0.0.0 port 8000 ...
+# 1. Pulisco regole precedenti per evitare duplicati, che mi hanno dato parecchi problemi ma non ho capito ancora come mai
+sudo iptables -t nat -F
+sudo iptables -F FORWARD
 
-# Aggiungi regola DNAT
+# 2. Attivo, IP forwarding --> l'ho fatto anche prima ma preferisco duplicarlo per essere più sicuro quando vado a fare la Demo visto che soesso me lo scordo
+sudo sysctl -w net.ipv4.ip_forward=1
+
+# 3. Regola DNAT per traffico in ingresso 
 sudo iptables -t nat -A PREROUTING -p tcp --dport 8080 \
-  -j DNAT --to 10.0.0.101:8000
+  -j DNAT --to-destination 10.0.0.101:8000
 
-# Abilita forward per il traffico in entrata
+# 4. Hairpin NAT--> senza questa non risucivo ed il curl falliva in continuazione 
+sudo iptables -t nat -A OUTPUT -p tcp --dport 8080 \
+  -j DNAT --to-destination 10.0.0.101:8000
+
+# 5. MASQUERADE per tutto il discorso visto prima
+sudo iptables -t nat -A POSTROUTING -d 10.0.0.101 -p tcp --dport 8000 \
+  -j MASQUERADE
+
+# 6. Forward t--> Garantiscono che i pacchetti DNAT-ati possano effettivamente attraversare l'host
 sudo iptables -A FORWARD -i veth0 -j ACCEPT
 sudo iptables -A FORWARD -o veth0 -j ACCEPT
 
-# Test
-curl http://10.0.0.100:8080
-# Atteso: listing HTML della directory — il DNAT ha reindirizzato
-#         la richiesta al server dentro ns2
+# 7. Verifica che il server sia vivo in ns2
+echo "[*] Verifica server in ns2..."
+sudo ip netns exec ns2 ss -tlnp | grep 8000 \
+  && echo "[OK] Server attivo" \
+  || echo "[WARN] Server non attivo, riavvio..."
+
+# 8. Test
+echo ""
+echo "[*] Test curl..."
+curl -v http://10.0.0.100:8080
 ```
+
+Il test dimostra come usare DNAT per rendere accessibile dall'esterno un servizio che gira all'interno di un network namespace isolato (ns2), simulando ciò che fa un router o firewall in port forwarding. Il namespace è opaco per chi opera al di fuori della subnet virtuale: senza regole esplicite, nessun pacchetto esterno raggiunge il servizio interno. L'unico modo per esporlo è configurare il main namespace come gateway NAT, abilitando il forwarding kernel e riscrivendo la destinazione dei pacchetti — esattamente il meccanismo usato da Docker per pubblicare le porte dei container tramite iptables.
+
 
 ### 4.9 Estensione B — ns2 e ns3 isolati ma entrambi con Internet
 
@@ -214,6 +237,7 @@ sudo ip netns exec ns3 ping -c 2 8.8.8.8   # 0% loss
 sudo ip netns exec ns2 ping -c 2 10.0.1.101  # 100% loss
 sudo ip netns exec ns3 ping -c 2 10.0.0.101  # 100% loss
 ```
+Creo un secondo namespace privato (ns3) con la propria subnet, lo connetto a Internet tramite NAT, ma lo isol0 completamente da ns2 così che, pur essendo connessi tra loro, non si vedano e non possano parlarsi , nonostante al contrario siano entrambi connessi all'esterno, tipo due VLAN dietro lo stesso router.
 
 ### 4.10 Teardown
 
