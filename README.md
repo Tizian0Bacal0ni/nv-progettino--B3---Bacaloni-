@@ -246,6 +246,18 @@ sudo Scripts/teardown.sh
 
 ```
 
+### 4.11 Ultima pulizia per usicre dalla cartella e cancellarla
+```bash
+#Esco dalla cartella del progetto
+cd ~
+
+#La rimuvoo
+rm -rf nv-progettino--B3---Bacaloni-
+
+
+```
+
+
 ---
 
 ## 5. Verifica del funzionamento
