@@ -49,7 +49,16 @@ Il pacchetto attraversa **due livelli di NAT** in sequenza:
 ### 4.1 Setup
 
 ```bash
-# Clona il repo e lancia il setup
+# Clona repository
+git clone https://github.com/Tizian0Bacal0ni/nv-progettino--B3---Bacaloni-
+
+# Per sicurezza entro nella repository
+ cd nv-progettino-B3-bacaloni
+
+
+
+
+# Lancia il setup
 sudo ./scripts/setup.sh
 # Atteso: namespace ns2 creato, veth configurate, ip_forward=1,
 #         regola MASQUERADE aggiunta su POSTROUTING
@@ -95,7 +104,7 @@ Il pacchetto attraversa **due livelli di NAT** in sequenza:
 
 ### 4.5 Verifica NAT in azione — tcpdump parallelo (7C)
 
-Aprire due terminali contemporaneamente:
+Serve aprire tre terminali contemporaneamente (quello su cui si era + altri 2)
 
 ```bash
 # Terminale A — pacchetti PRIMA del NAT
@@ -105,54 +114,59 @@ sudo tcpdump -n -i veth0 icmp
 # Terminale B — pacchetti DOPO il NAT
 sudo tcpdump -n -i eth0 icmp
 # Atteso: src=172.20.130.147 (IP già tradotto da MASQUERADE)
+
+# Terminale C- invio pacchetti da SNIFFare
+ sudo ip netns exec ns2 ping -c 2 8.8.8.8
 ```
 
-La differenza di IP sorgente tra le due interfacce dimostra visivamente
-il punto esatto in cui avviene la traduzione.
+Confrontando gli IP sorgente  si vede chiaramente la differenza agli estremi del canale di comunicazione creato
+tra ns2t, evidenziando che nel mezzo il masquerade avviene in maniera corretta. 
 
 ### 4.6 Ablazione 1 — solo ip_forward, senza MASQUERADE
 
+Serve avere aperti due terminali (quello su cui si lavora + un altro)
 ```bash
 # Rimuovi MASQUERADE
 sudo iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE
 
-# Test — deve fallire
-sudo ip netns exec ns2 ping -c 3 8.8.8.8
-# Atteso: 100% packet loss
-
-# Verifica con tcpdump: il pacchetto esce su eth0 con IP privato
+# Avvio dello sniffer sul terminale di lavoro
 sudo tcpdump -n -i eth0 icmp
-# Atteso: src=10.0.0.101 — Internet riceve ma non sa dove rispondere
 
-# Ripristina
+# Run test sul terminale B
+sudo ip netns exec ns2 ping -c 3 8.8.8.8
+
+# Ripristino
 sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE
 ```
+A conferma di quanto accennato al punto precedente, in questo caso l'eliminazione del MAQUERADE dalla tabella NAT DI iptables
+impedisce la conclusione della comunicazione: questo perchè l'inidirzzo con cui i pacchetti passano da veth0 a eth0,
+attraverso il canale di comunicazione tra i due spazi, rimane identico, per cui rimane **privato** e per tanto invisibile
+agli occhi della rete INternet
 
-**Perché fallisce:** i pacchetti vengono forwardati su eth0 ma con
-`src=10.0.0.101` — un indirizzo RFC 1918 invisibile su Internet.
-Le risposte non tornano mai.
 
 ### 4.7 Ablazione 2 — solo MASQUERADE, senza ip_forward
 
+Servono 3 terminali: quello di lavoro + altri 2
 ```bash
 # Disabilita ip_forward
 sudo sysctl -w net.ipv4.ip_forward=0
 
-# Test — deve fallire
-sudo ip netns exec ns2 ping -c 3 8.8.8.8
-# Atteso: 100% packet loss
+# Attivazione sniffer lato veth0 (interno a ns2, quindi)
+ sudo tcpdump -n -i veth0 icmp
 
-# Verifica con tcpdump:
-# - su veth0: si vedono i pacchetti (il kernel li riceve)
-# - su eth0:  silenzio totale (il kernel droppa prima di forwardare)
+#ATtivazione sniffer lato eth0 ( interno a mainspace, quindi non dovrebbe vedere)
+ sudo tcpdump -n -i eth0 icmp
+
+# Ping a google sul Terminale C
+sudo ip netns exec ns2 ping -c 3 8.8.8.8
 
 # Ripristina
 sudo sysctl -w net.ipv4.ip_forward=1
 ```
+Il test chiaramente fallisce, nel senso che lo sniffer interno a ns2 vede i pacchetti con IP di partenza privato
+mentre quello attivato nel mainspace non vede nulla e registra solo silenzion perché non gli vengono forwardati: nonostante
+il MASQUERADE sia attivo il kernel droppa i pacchetti prima che si attivi la carena POSTROUTING di iptables
 
-**Perché fallisce in modo diverso dall'Ablazione 1:** con `ip_forward=0`
-il kernel droppa i pacchetti prima ancora di raggiungere la catena
-POSTROUTING di iptables. MASQUERADE non viene mai eseguito.
 
 ### 4.8 Estensione A — DNAT per esporre un servizio in ns2
 
@@ -264,6 +278,11 @@ indipendenti, come dimostrato nell'Estensione A.
 - Con `ip_forward=1` e due subnet configurate, il main namespace forwarda
   automaticamente tra ns2 e ns3; l'isolamento richiede regole DROP
   esplicite sulla catena FORWARD.
+- In assenza di una corretta pulizia della shell di comando in caso di lavoro
+  non consecutivo ma ,ad esempio, spalamato su più giorni, la quantità di errori incontrata
+  aumenta in modo rilevante: al punto 4.8 ad esempio si incorre nell'errore di vedere occupata la porta
+  800 e, per poter procedere, bisogna predisporre un repulisti generale.
+-Collegato al punto precedente
 
 ---
 
