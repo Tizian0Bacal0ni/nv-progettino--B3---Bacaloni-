@@ -4,18 +4,17 @@
 # Uso: sudo ./scripts/teardown.sh
 
 
-sudo ip link del veth0 2>/dev/null || true
-sudo ip netns del ns2 2>/dev/null || true
-sudo ip netns del ns3 2>/dev/null || true
-sudo iptables -t nat -F POSTROUTING
+#!/usr/bin/env bash
+# teardown.sh — Rimuove tutto l'ambiente NAT/masquerading del progettino B3
 
-set -euo pipefail
+set -euo pipefail   
 
-# Esco dalla directory del progetto
-cd ~
+# Faccio un pi di pulizia generale perchè l'estensione A mi lascia un po di rumore sennò
+sudo ip link del veth0   2>/dev/null || true
+sudo ip netns del ns2    2>/dev/null || true
+sudo ip netns del ns3    2>/dev/null || true
 
-# La cancello 
-rm -rf nv-progettino--B3---Bacaloni-
+
 
 echo "[1/8] Rimozione regola iptables MASQUERADE su POSTROUTING..."
 iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE \
@@ -56,6 +55,12 @@ ip link del veth2 \
 echo "[8/8] Rimozione /etc/netns/ns2 (DNS override)..."
 rm -rf /etc/netns/ns2 \
   && echo "  OK" || echo "  (non presente, skip)"
+
+#Esco dalla cartella del progetto
+cd ~
+
+#La rimuvoo
+rm -rf nv-progettino--B3---Bacaloni-
 
 echo ""
 echo "=== Teardown completato ==="
