@@ -3,7 +3,7 @@
 
 **Autore:** Tiziano Bacaloni
 **Codice variante:** B3
-**Repo:** https://github.com/.../nv-progettino-B3-bacaloni
+**Repo:** https://github.com/.../nv-progettino-B3-Bacaloni
 
 ---
 
