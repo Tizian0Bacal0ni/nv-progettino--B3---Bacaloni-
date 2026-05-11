@@ -3,6 +3,12 @@
 # Tiziano Bacaloni — variante B3
 # Uso: sudo ./scripts/teardown.sh
 
+
+sudo ip link del veth0 2>/dev/null || true
+sudo ip netns del ns2 2>/dev/null || true
+sudo ip netns del ns3 2>/dev/null || true
+sudo iptables -t nat -F POSTROUTING
+
 set -euo pipefail
 
 # Esco dalla directory del progetto
