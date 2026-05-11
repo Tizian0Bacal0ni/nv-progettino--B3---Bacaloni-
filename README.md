@@ -91,62 +91,6 @@ Il pacchetto attraversa **due livelli di NAT** in sequenza:
 1. iptables MASQUERADE: `10.0.0.101` → IP di `eth0` (main namespace WSL)
 2. NAT Hyper-V/Windows: IP di `eth0` → IP pubblico del router di casa
 
----
-
-## 3. Prerequisiti
-
-| Componente | Versione |
-|---|---|
-| WSL2 Ubuntu | 24.04 LTS |
-| iproute2 | preinstallato |
-| iptables | preinstallato |
-| conntrack-tools | `sudo apt install conntrack` |
-| python3 | preinstallato (per Estensione A) |
-| curl | preinstallato |
-
----
-
-## 4. Come riprodurre passo per passo
-
-### 4.1 Setup
-
-```bash
-# Clona il repo e lancia il setup
-sudo ./scripts/setup.sh
-# Atteso: namespace ns2 creato, veth configurate, ip_forward=1,
-#         regola MASQUERADE aggiunta su POSTROUTING
-```
-
-### 4.2 Verifica connettività base
-
-```bash
-# Test 1: raggiungibilità del gateway da ns2
-sudo ip netns exec ns2 ping -c 3 10.0.0.100
-# Atteso: 0% packet loss
-
-# Test 2: connettività Internet via IP
-sudo ip netns exec ns2 ping -c 3 8.8.8.8
-# Atteso: 0% packet loss — il masquerading funziona
-
-# Test 3: connettività Internet via hostname
-sudo ip netns exec ns2 ping -c 3 www.google.com
-# Atteso: 0% packet loss — DNS funziona via /etc/netns/ns2/resolv.conf
-```
-
-### 4.3 Verifica NAT in azione — iptables (7A)
-
-```bash
-sudo iptables -t nat -L POSTROUTING -n -v
-# Atteso: regola MASQUERADE con contatori pkts/bytes > 0 dopo i ping
-```
-
-### 4.4 Verifica NAT in azione — conntrack (7B)
-
-```bash
-sudo conntrack -L | grep 8.8.8.8
-# Atteso: entry con src=10.0.0.101 (originale) e dst=172.20.130.x
-#         (IP tradotto) — prova dello SNAT effettivo
-```
 
 
 ### 4.5 Verifica NAT in azione — tcpdump parallelo (7C)
