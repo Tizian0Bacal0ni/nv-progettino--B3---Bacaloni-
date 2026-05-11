@@ -61,7 +61,7 @@ chmod +x Scripts/teardown.sh
 
 
 # Lancia il setup
-sudo ./Scripts/setup.sh
+sudo Scripts/setup.sh
 # Atteso: namespace ns2 creato, veth configurate, ip_forward=1,
 #         regola MASQUERADE aggiunta su POSTROUTING
 ```
@@ -242,9 +242,8 @@ Creo un secondo namespace privato (ns3) con la propria subnet, lo connetto a Int
 ### 4.10 Teardown
 
 ```bash
-sudo ./scripts/teardown.sh
-# Atteso: namespace ns2 (e ns3 se creato) eliminati, regole iptables
-#         ripulite, /etc/netns/ rimosso
+sudo Scripts/teardown.sh
+
 ```
 
 ---
