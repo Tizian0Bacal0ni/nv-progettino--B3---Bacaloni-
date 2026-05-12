@@ -320,12 +320,13 @@ indipendenti, come dimostrato nell'Estensione A.
   regola OUTPUT.
 - Con `ip_forward=1` e due subnet configurate, il main namespace forwarda
   automaticamente tra ns2 e ns3; l'isolamento richiede regole DROP
-  esplicite sulla catena FORWARD.
+  esplicite.
 - In assenza di una corretta pulizia della shell di comando in caso di lavoro
   non consecutivo ma ,ad esempio, spalamato su più giorni, la quantità di errori incontrata
   aumenta in modo rilevante: al punto 4.8 ad esempio si incorre nell'errore di vedere occupata la porta
   800 e, per poter procedere, bisogna predisporre un repulisti generale.
--Collegato al punto precedente
+-Collegato al punto precedente, la coretta esecuzione dei comandi relativi all'estensione A ha richiesto la attivazione manuale del server
+  che altrimenti viene riportato in stato di disattivazione
 
 ---
 
