@@ -9,12 +9,6 @@
 
 set -euo pipefail   
 
-# Faccio un pi di pulizia generale perchè l'estensione A mi lascia un po di rumore sennò
-sudo ip link del veth0   2>/dev/null || true
-sudo ip netns del ns2    2>/dev/null || true
-sudo ip netns del ns3    2>/dev/null || true
-
-
 
 echo "[1/8] Rimozione regola iptables MASQUERADE su POSTROUTING..."
 iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o eth0 -j MASQUERADE \
