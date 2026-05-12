@@ -53,7 +53,7 @@ Il pacchetto attraversa **due livelli di NAT** in sequenza:
 git clone https://github.com/Tizian0Bacal0ni/nv-progettino--B3---Bacaloni-
 
 # Per sicurezza entro nella repository
-cd nv-progettino--B3---bacaloni-
+cd 'nv-progettino--B3---Bacaloni-'
 
 # Serve per usare i comandi rapidi su
 chmod +x Scripts/setup.sh
@@ -116,7 +116,6 @@ sudo tcpdump -n -i veth0 icmp
 
 # Terminale B — pacchetti DOPO il NAT
 sudo tcpdump -n -i eth0 icmp
-# Atteso: src=172.20.130.147 (IP già tradotto da MASQUERADE)
 
 # Terminale C- invio pacchetti da SNIFFare
  sudo ip netns exec ns2 ping -c 2 8.8.8.8
@@ -154,10 +153,10 @@ Servono 3 terminali: quello di lavoro + altri 2
 # Disabilita ip_forward
 sudo sysctl -w net.ipv4.ip_forward=0
 
-# Attivazione sniffer lato veth0 (estremità del cavo interna a namespace)
+# Attivazione sniffer lato veth0 (estremità del cavo interna a namespace) sul terminale A
  sudo tcpdump -n -i veth0 icmp
 
-#ATtivazione sniffer lato eth0 ( interfaccia che punta verso internet)
+#ATtivazione sniffer lato eth0 ( interfaccia che punta verso internet) sul terminale B
  sudo tcpdump -n -i eth0 icmp
 
 # Ping a google sul Terminale C
@@ -203,6 +202,9 @@ sudo ip netns exec ns2 ss -tlnp | grep 8000 \
   && echo "[OK] Server attivo" \
   || echo "[WARN] Server non attivo, riavvio..."
 
+## DA USARE SOLO NEL CASO ALLA RIGA PRIMA RISULTI IL SERVER NON ATTIVO
+sudo ip netns exec ns2 python3 -m http.server 8000 &
+
 # 8. Test
 echo ""
 echo "[*] Test curl..."
@@ -242,6 +244,12 @@ Creo un secondo namespace privato (ns3) con la propria subnet, lo connetto a Int
 ### 4.10 Teardown
 
 ```bash
+
+# Comandi di pulizia finale
+sudo ip link del veth0   2>/dev/null || true
+sudo ip netns del ns2    2>/dev/null || true
+sudo ip netns del ns3    2>/dev/null || true
+
 sudo Scripts/teardown.sh
 
 ```
