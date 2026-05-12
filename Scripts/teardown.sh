@@ -50,6 +50,10 @@ echo "[8/8] Rimozione /etc/netns/ns2 (DNS override)..."
 rm -rf /etc/netns/ns2 \
   && echo "  OK" || echo "  (non presente, skip)"
 
+echo "[9/8]  OK conntrack svuotato"
+sudo conntrack -F
+
+
 # Per essere sicuro
 sudo iptables -t nat -F
 sudo iptables -t nat -L POSTROUTING -n -v  # verifica: deve essere vuota
